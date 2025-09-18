@@ -1,0 +1,179 @@
+<!-- Filters Section Extracted from scheduling.html -->
+<!-- Main Filters Dropdown and Button -->
+<button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="filtersDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+    <i class="fas fa-filter"></i> Filters
+</button>
+<div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 220px;" aria-labelledby="filtersDropdownBtn">
+    <input class="form-check-input filter-checkbox" type="checkbox" value="gender" id="filterGender">
+    <label class="form-check-label" for="filterGender">Gender</label><br>
+    <input class="form-check-input filter-checkbox" type="checkbox" value="faculty" id="filterFaculty">
+    <label class="form-check-label" for="filterFaculty">Faculty</label><br>
+    <input class="form-check-input filter-checkbox" type="checkbox" value="department" id="filterDepartment">
+    <label class="form-check-label" for="filterDepartment">Department</label><br>
+    <input class="form-check-input filter-checkbox" type="checkbox" value="program" id="filterProgram">
+    <label class="form-check-label" for="filterProgram">Program/Trainings</label><br>
+    <input class="form-check-input filter-checkbox" type="checkbox" value="date" id="filterDate">
+    <label class="form-check-label" for="filterDate">Date</label><br>
+    <input class="form-check-input filter-checkbox" type="checkbox" value="hall" id="filterHall">
+    <label class="form-check-label" for="filterHall">Hall</label><br>
+    <input class="form-check-input filter-checkbox" type="checkbox" value="status" id="filterStatus">
+    <label class="form-check-label" for="filterStatus">Status</label>
+    <button class="btn btn-primary btn-sm w-100 mt-2" id="applyFiltersBtn" type="button" disabled>Select</button>
+    <div id="clearFiltersRow" style="display: none;">
+        <button id="clearFiltersBtn" class="btn btn-warning btn-sm">
+            <i class="fas fa-times"></i> Clear Filters
+        </button>
+    </div>
+</div>
+
+<!-- Gender Filter Modal -->
+<div class="modal fade" id="genderFilterModal" tabindex="-1" aria-labelledby="genderFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="genderFilterModalLabel">Select Gender</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Gender options go here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="applyGenderFilterBtn" disabled>Apply Filter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Faculty Filter Modal -->
+<div class="modal fade" id="facultyFilterModal" tabindex="-1" aria-labelledby="facultyFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="facultyFilterModalLabel">Select Faculty</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control mb-3" id="facultyFilterSearchInput" placeholder="Search faculty by name, department, or T. No...">
+                <div id="facultyFilterSearchResults" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="applyFacultyFilterBtn" disabled>Apply Filter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Department Filter Modal -->
+<div class="modal fade" id="departmentFilterModal" tabindex="-1" aria-labelledby="departmentFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="departmentFilterModalLabel">Select Department</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control mb-3" id="departmentFilterSearchInput" placeholder="Search department...">
+                <div id="departmentFilterSearchResults" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="applyDepartmentFilterBtn" disabled>Apply Filter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Program/Trainings Filter Modal -->
+<div class="modal fade" id="programTrainingsFilterModal" tabindex="-1" aria-labelledby="programTrainingsFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="programTrainingsFilterModalLabel">Program/Trainings Filter</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <select class="form-select" id="filterModalProgramCategory"></select>
+                <input type="checkbox" id="filterSelectAllTrainings"> <label for="filterSelectAllTrainings"><strong>Select All</strong></label>
+                <div id="filterTrainingsCheckboxList" style="max-height: 180px; overflow-y: auto; border: 1px solid #eee; padding: 6px; border-radius: 4px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="applyProgramTrainingsFilterBtn" disabled>Apply Filter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Date Filter Modal -->
+<div class="modal fade" id="dateFilterModal" tabindex="-1" aria-labelledby="dateFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dateFilterModalLabel">Date Filter</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Filter Type</label>
+                <select class="form-select" id="dateFilterType">
+                    <option value="single">Single Date</option>
+                    <option value="range">Date Range</option>
+                    <option value="multiple">Multiple Dates</option>
+                    <option value="month">Month</option>
+                    <option value="year">Year</option>
+                </select>
+                <div id="singleDateSection" class="date-filter-section">
+                    <!-- Single date picker here -->
+                </div>
+                <div id="rangeSection" class="date-filter-section" style="display: none;">
+                    <!-- Range date pickers here -->
+                </div>
+                <div id="multipleSection" class="date-filter-section" style="display: none;">
+                    <!-- Multiple date pickers here -->
+                </div>
+                <div id="monthSection" class="date-filter-section" style="display: none;">
+                    <!-- Month picker here -->
+                </div>
+                <div id="yearSection" class="date-filter-section" style="display: none;">
+                    <!-- Year picker here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="applyDateFilterBtn">Apply Filter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hall Filter Modal -->
+<div class="modal fade" id="hallFilterModal" tabindex="-1" aria-labelledby="hallFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="hallFilterModalLabel">Filter by Hall</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Hall options go here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="applyHallFilterBtn">Apply Filter</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Filter Modal -->
+<div class="modal fade" id="statusFilterModal" tabindex="-1" aria-labelledby="statusFilterModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusFilterModalLabel">Filter by Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Status options go here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="applyStatusFilterBtn">Apply Filter</button>
+            </div>
+        </div>
+    </div>
+</div> 

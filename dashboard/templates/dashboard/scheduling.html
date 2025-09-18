@@ -1,0 +1,495 @@
+<select class="form-select" id="modalProgramType" name="program_type" required>
+  <option value="">Select Program Type</option>
+  <option value="Calendar Program">Calendar Program</option>
+  <option value="Non Calendar Program">Non Calendar Program</option>
+</select> 
+
+// Update program type badge
+function updateProgramTypeBadge(programType) {
+    const badge = document.getElementById('programTypeBadge');
+    if (badge) {
+        const isCalendar = programType === 'Calendar Program';
+        badge.className = `badge bg-${isCalendar ? 'primary' : 'secondary'}`;
+        badge.innerHTML = `<i class="fas fa-${isCalendar ? 'calendar-alt' : 'folder'}"></i> ${programType}`;
+    }
+}
+
+// Update the calendar event rendering
+function renderCalendarEvent(schedule) {
+    try {
+        if (!schedule) {
+            console.warn('renderCalendarEvent: schedule is undefined or null');
+            return null;
+        }
+
+        if (!schedule.date || !schedule.start_time) {
+            console.warn('renderCalendarEvent: missing date or start_time', schedule);
+            return null;
+        }
+
+        const startDate = new Date(`${schedule.date}T${schedule.start_time}`);
+        if (isNaN(startDate.getTime())) {
+            console.warn('renderCalendarEvent: invalid date format', schedule.date, schedule.start_time);
+            return null;
+        }
+        
+        let endDate = null;
+        if (schedule.duration) {
+            endDate = new Date(startDate.getTime() + schedule.duration * 60 * 60 * 1000);
+        }
+        
+        const colors = getEventColor(schedule);
+        const programTypeIcon = schedule.program_type === 'Non Calendar Program' ? '🗂️' : '📅';
+        
+        return {
+            id: schedule.id,
+            title: `${programTypeIcon} ${schedule.program}${schedule.faculty ? ' (' + schedule.faculty + ')' : ' (No Faculty)'}`,
+            start: startDate.toISOString(),
+            end: endDate ? endDate.toISOString() : undefined,
+            backgroundColor: colors.backgroundColor,
+            borderColor: colors.borderColor,
+            textColor: colors.textColor,
+            extendedProps: {
+                program: schedule.program,
+                program_id: schedule.program_id,
+                program_type: schedule.program_type || 'Calendar Program',
+                faculty: schedule.faculty,
+                hall: schedule.hall,
+                duration: schedule.duration,
+                students: schedule.students,
+                status: schedule.status,
+                occupancy: schedule.occupancy
+            }
+        };
+    } catch (error) {
+        console.error('Error rendering calendar event:', error, schedule);
+        return null;
+    }
+}
+
+// Update the table row rendering
+function renderScheduleTableRow(schedule) {
+    try {
+        if (!schedule) {
+            console.warn('renderScheduleTableRow: schedule is undefined or null');
+            return '';
+        }
+
+        const programTypeIcon = schedule.program_type === 'Non Calendar Program' ? '🗂️' : '📅';
+        const programTypeClass = schedule.program_type === 'Non Calendar Program' ? 'non-calendar' : 'calendar';
+        
+        return `
+            <tr class="schedule-row ${programTypeClass}">
+                <td>
+                    <div class="d-flex align-items-center">
+                        <span class="program-type-icon me-2">${programTypeIcon}</span>
+                        <span class="me-2">${schedule.program || ''}</span>
+                        <span class="badge bg-${programTypeClass === 'calendar' ? 'primary' : 'secondary'}">${schedule.program_type || 'Calendar Program'}</span>
+                    </div>
+                </td>
+                <td>${schedule.training_name || ''}</td>
+                <td>${schedule.date || ''}</td>
+                <td>${schedule.start_time || ''}</td>
+                <td>${schedule.duration ? schedule.duration + ' hrs' : ''}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-user-tie me-2 text-muted"></i>
+                        ${schedule.faculty || ''}
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex flex-column">
+                        <span>${schedule.hall || ''}</span>
+                        <div class="occupancy-bar mt-1">
+                            <div class="occupancy-fill" style="width: ${calculateOccupancyPercent(schedule.occupancy)}%"></div>
+                        </div>
+                        <small class="text-muted">${schedule.occupancy || ''}</small>
+                    </div>
+                </td>
+                <td>${schedule.students || ''}</td>
+                <td>
+                    <span class="status-badge status-${(schedule.status || 'Planned').toLowerCase()}" 
+                          data-bs-toggle="tooltip" 
+                          title="${getStatusTooltip(schedule.status || 'Planned')}">
+                        ${schedule.status || 'Planned'}
+                    </span>
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary edit-schedule-btn" 
+                                data-id="${schedule.id}"
+                                data-bs-toggle="tooltip"
+                                title="Edit Schedule">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger delete-schedule-btn" 
+                                data-id="${schedule.id}"
+                                data-bs-toggle="tooltip"
+                                title="Delete Schedule">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    } catch (error) {
+        console.error('Error rendering schedule table row:', error, schedule);
+        return '';
+    }
+}
+
+// Update program selection handler
+document.addEventListener('DOMContentLoaded', function() {
+    const programSelect = document.getElementById('modalProgram');
+    if (programSelect) {
+        programSelect.addEventListener('change', async function() {
+            const selectedId = this.value;
+            const modalCategory = document.getElementById('modalCategory');
+            const modalDescription = document.getElementById('modalDescription');
+            const modalProgramType = document.getElementById('modalProgramType');
+            const trainingsList = document.getElementById('trainingsCheckboxList');
+            const trainingsContainer = document.getElementById('trainingsCheckboxContainer');
+            
+            // Clear fields if no program selected
+            if (!selectedId) {
+                if (modalCategory) modalCategory.value = '';
+                if (modalDescription) modalDescription.value = '';
+                if (modalProgramType) modalProgramType.value = '';
+                if (trainingsList) trainingsList.innerHTML = '';
+                if (trainingsContainer) trainingsContainer.style.display = 'none';
+                return;
+            }
+            
+            try {
+                // Show loading state
+                if (modalCategory) modalCategory.value = 'Loading...';
+                if (modalDescription) modalDescription.value = 'Loading...';
+                if (trainingsContainer) trainingsContainer.style.display = 'none';
+                
+                // Find program in allPrograms array
+                const program = allPrograms.find(p => p.id == selectedId);
+                if (!program) {
+                    throw new Error('Program not found');
+                }
+                
+                // Update category, description and program type
+                if (modalCategory) modalCategory.value = program.category || '';
+                if (modalDescription) modalDescription.value = program.description || '';
+                if (modalProgramType) {
+                    modalProgramType.value = program.program_type || 'Calendar Program';
+                    // Update the badge
+                    updateProgramTypeBadge(program.program_type);
+                }
+                
+                // Fetch and display trainings
+                const trainingsResponse = await fetch(`/api/trainings/?program_id=${selectedId}`);
+                if (!trainingsResponse.ok) throw new Error('Failed to fetch trainings');
+                const data = await trainingsResponse.json();
+                const trainings = data.trainings || [];
+                
+                if (trainingsList && trainingsContainer) {
+                    trainingsList.innerHTML = '';
+                    if (trainings.length === 0) {
+                        trainingsList.innerHTML = '<div class="text-muted">No trainings available for this program.</div>';
+                        trainingsContainer.style.display = 'none';
+                    } else {
+                        trainingsContainer.style.display = '';
+                        trainings.forEach(training => {
+                            const div = document.createElement('div');
+                            div.className = 'form-check';
+                            div.innerHTML = `
+                                <input class="form-check-input" type="checkbox" name="trainings" value="${training.id}" id="training_${training.id}">
+                                <label class="form-check-label" for="training_${training.id}">
+                                    ${training.training_name}
+                                </label>
+                            `;
+                            trainingsList.appendChild(div);
+                        });
+                    }
+                    updateTrainingModalButtons();
+                }
+            } catch (error) {
+                console.error('Error loading program details:', error);
+                showToast('Error loading program details. Please try again.', 'error');
+                // Clear fields on error
+                if (modalCategory) modalCategory.value = '';
+                if (modalDescription) modalDescription.value = '';
+                if (modalProgramType) modalProgramType.value = '';
+                if (trainingsList) trainingsList.innerHTML = '';
+                if (trainingsContainer) trainingsContainer.style.display = 'none';
+            }
+        });
+    }
+});
+
+// Add program type validation and visual indicators
+document.addEventListener('DOMContentLoaded', function() {
+    const programTypeSelect = document.getElementById('modalProgramType');
+    if (programTypeSelect) {
+        programTypeSelect.addEventListener('change', function() {
+            const selectedType = this.value;
+            const programTypeBadge = document.getElementById('programTypeBadge');
+            
+            // Update visual indicator
+            if (programTypeBadge) {
+                programTypeBadge.className = 'badge';
+                if (selectedType === 'Calendar Program') {
+                    programTypeBadge.classList.add('bg-primary');
+                    programTypeBadge.innerHTML = '<i class="fas fa-calendar-alt"></i> Calendar Program';
+                } else if (selectedType === 'Non Calendar Program') {
+                    programTypeBadge.classList.add('bg-secondary');
+                    programTypeBadge.innerHTML = '<i class="fas fa-folder"></i> Non Calendar Program';
+                }
+            }
+            
+            // Validate program type
+            if (!selectedType) {
+                showToast('Please select a program type', 'warning');
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-invalid');
+            }
+        });
+    }
+});
+
+// Add time parsing helper function
+function parse_time(time_str) {
+    if (!time_str) return null;
+    
+    // Remove any extra spaces
+    time_str = time_str.trim();
+    
+    // Handle 12-hour format with AM/PM
+    const ampmPattern = /(am|pm|a|p)$/i;
+    const formattedPattern = /^\d{1,2}:\d{2}\s*(AM|PM)$/i;
+    
+    if (ampmPattern.test(time_str.replace(/\s+/g, '')) || formattedPattern.test(time_str)) {
+        // Convert to 24-hour format
+        const [time, period] = time_str.split(/(?=[AP]M)/i);
+        const [hours, minutes] = time.split(':').map(Number);
+        let hour24 = hours;
+        
+        if (period.toLowerCase().includes('p') && hours !== 12) {
+            hour24 = hours + 12;
+        } else if (period.toLowerCase().includes('a') && hours === 12) {
+            hour24 = 0;
+        }
+        
+        return `${hour24.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+    
+    // Handle 24-hour format
+    const [hours, minutes] = time_str.split(':').map(Number);
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+    
+    return null;
+}
+
+function to12HourFormat(time_str) {
+    if (!time_str) return '';
+    
+    // Remove any extra spaces
+    time_str = time_str.trim();
+    
+    // If already in 12-hour format, return as is
+    if (/(am|pm|a|p)$/i.test(time_str)) {
+        return time_str;
+    }
+    
+    // Convert from 24-hour format
+    const [hours, minutes] = time_str.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    return `${hour12}:${minutes.toString().padStart(2, '0')} ${period}`;
+}
+
+// Update the saveTrainingSchedules function
+async function saveTrainingSchedules() {
+    const saveBtn = document.querySelector('button[onclick="saveTrainingSchedules()"]');
+    if (!saveBtn) return;
+    
+    const originalBtnText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+
+    try {
+        // Get all training schedules
+        const trainingSchedules = [];
+        const trainingCards = document.querySelectorAll('#trainingsScheduleList .card');
+        
+        trainingCards.forEach(card => {
+            let trainingId = card.dataset.trainingId;
+            if (!trainingId) {
+                const childWithId = card.querySelector('[data-training-id]');
+                trainingId = childWithId ? childWithId.dataset.trainingId : null;
+            }
+            if (!trainingId) {
+                console.warn('No trainingId found for a training card, skipping.');
+                return;
+            }
+
+            const startTime = card.querySelector('.training-time')?.value;
+            const parsedTime = parse_time(startTime);
+            if (!parsedTime) {
+                throw new Error('Invalid time format. Please use HH:MM or HH:MM AM/PM format.');
+            }
+
+            const schedule = {
+                training_id: trainingId,
+                date: card.querySelector('.training-date')?.value,
+                start_time: parsedTime,
+                duration: card.querySelector('.training-duration')?.value,
+                faculty_id: card.querySelector('.training-faculty')?.value,
+                hall_id: card.querySelector('.training-hall')?.value,
+                students: card.querySelector('.training-students')?.value
+            };
+
+            // Validate required fields
+            if (!schedule.date || !schedule.start_time || !schedule.duration || 
+                !schedule.faculty_id || !schedule.hall_id || !schedule.students) {
+                throw new Error('Please fill in all required fields for each training');
+            }
+
+            trainingSchedules.push(schedule);
+        });
+
+        if (trainingSchedules.length === 0) {
+            throw new Error('No training schedules to save');
+        }
+
+        // Get program details from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const programId = urlParams.get('program_id');
+        
+        if (!programId) {
+            throw new Error('Program ID not found');
+        }
+
+        // Save all schedules
+        const response = await fetch('/api/schedules/bulk-create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                program_id: programId,
+                schedules: trainingSchedules
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to save schedules');
+        }
+
+        if (result.success) {
+            showToast('All schedules saved successfully!', 'success');
+            // Redirect back to the same page with selected_date if available
+            let selectedDateStr = window.selectedDateStr || null;
+            let url = window.location.pathname + window.location.search;
+            if (selectedDateStr && !url.includes('selected_date=')) {
+                url += (url.includes('?') ? '&' : '?') + 'selected_date=' + selectedDateStr;
+            }
+            window.location.href = url;
+        } else {
+            throw new Error(result.error || 'Failed to save schedules');
+        }
+
+    } catch (error) {
+        console.error('Error saving schedules:', error);
+        showToast(error.message || 'Error saving schedules', 'error');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalBtnText;
+    }
+} 
+
+<!--
+{# --- BEGIN: Filter Controls (Commented Out, moved to filters.html) --- #}
+[PASTE ALL FILTER CONTROLS AND MODALS CODE HERE]
+{# --- END: Filter Controls (Commented Out) --- #}
+-->
+
+{% include "dashboard/filters.html" %} 
+
+<div class="d-flex flex-nowrap align-items-center gap-3" id="allChipsContainer" style="width:100%;">
+    <div id="statusChipsContainer" class="d-flex flex-nowrap align-items-center gap-2"></div>
+    <div id="programTypeChipsContainer" class="d-flex flex-nowrap align-items-center gap-2 ms-3"></div>
+</div> 
+
+<style>
+#allChipsContainer {
+    flex-wrap: nowrap !important;
+    width: 100%;
+    align-items: center;
+}
+#allChipsContainer > div {
+    flex-shrink: 0;
+}
+#allChipsContainer .chip {
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+}
+</style> 
+
+async function loadTrainingsByProgramId(programId) {
+    try {
+        if (!programId) return;
+        const response = await fetch(`/api/trainings/?program_id=${programId}`);
+        if (!response.ok) throw new Error('Failed to fetch trainings');
+        const data = await response.json();
+        const trainings = data.trainings || [];
+        console.log('[DEBUG] Trainings fetched for program:', trainings);
+
+        const trainingsList = document.getElementById('trainingsCheckboxList');
+        const trainingsContainer = document.getElementById('trainingsCheckboxContainer');
+
+        // Fill category and description fields
+        const programSelect = document.getElementById('modalProgram');
+        const selectedProgramId = programSelect ? programSelect.value : null;
+        let selectedProgram = null;
+        if (selectedProgramId && window.allPrograms && Array.isArray(window.allPrograms)) {
+            selectedProgram = window.allPrograms.find(p => String(p.id) === String(selectedProgramId));
+        }
+        const modalCategory = document.getElementById('modalCategory');
+        const modalDescription = document.getElementById('modalDescription');
+        if (selectedProgram) {
+            if (modalCategory) modalCategory.value = selectedProgram.category || '';
+            if (modalDescription) modalDescription.value = selectedProgram.description || '';
+        } else {
+            if (modalCategory) modalCategory.value = '';
+            if (modalDescription) modalDescription.value = '';
+        }
+
+        if (trainingsList) {
+            trainingsList.innerHTML = '';
+            if (trainings.length === 0) {
+                trainingsList.innerHTML = '<div class="text-muted">No trainings available for this program.</div>';
+                if (trainingsContainer) trainingsContainer.style.display = 'none';
+            } else {
+                trainingsContainer && (trainingsContainer.style.display = '');
+                trainings.forEach(training => {
+                    const div = document.createElement('div');
+                    div.className = 'form-check';
+                    div.innerHTML = `
+                        <input class="form-check-input" type="checkbox" name="trainings" value="${training.id}" id="training_${training.id}">
+                        <label class="form-check-label" for="training_${training.id}">
+                            ${training.training_name}
+                        </label>
+                    `;
+                    trainingsList.appendChild(div);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('[DEBUG] Error loading trainings by program:', error);
+        const trainingsList = document.getElementById('trainingsCheckboxList');
+        if (trainingsList) {
+            trainingsList.innerHTML = '<div class="text-danger">Error loading trainings. Please try again.</div>';
+        }
+    }
+} 
